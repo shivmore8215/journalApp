@@ -51,7 +51,7 @@ public class JournalEntryControllerV2 {
 
     @DeleteMapping("delete/{myId}")
     public ResponseEntity<?> deleteJournalEntryById(@PathVariable ObjectId myId){
-        List<JournalEntry> oldEntry = (List<JournalEntry>) journalEntryService.findById(myId).orElse(null);
+        JournalEntry oldEntry =  journalEntryService.findById(myId).orElse(null);
         if(oldEntry != null) {
             journalEntryService.deleteById(myId);
             return new ResponseEntity<>("Deleted Successfully", HttpStatus.OK);
