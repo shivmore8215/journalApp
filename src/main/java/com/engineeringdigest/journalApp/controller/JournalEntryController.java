@@ -1,52 +1,95 @@
-/*
+package com.engineeringdigest.journalApp.controller;
 
-* Don't remove comment , it is kept for only read purpose
-* Created Initially to demonstrate the working of rest API
-* Now it will not work because I am going to change the code t work with MongoDB
-    (The datatype of id is changed to String so it may create error in whole code)
-
-
-package com.engineeringdigest.journal.controller;
-
-import com.engineeringdigest.journal.entity.JournalEntry;
+import com.engineeringdigest.journalApp.entity.JournalEntry;
+import com.engineeringdigest.journalApp.entity.User;
+import com.engineeringdigest.journalApp.service.JournalEntryService;
+import com.engineeringdigest.journalApp.service.UserService;
+import org.bson.types.ObjectId;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 
+// Controller ---> Service ---> Repository
 @RestController
-@RequestMapping("journal-array")
+@RequestMapping("/journal")
 public class JournalEntryController {
-    private Map<Long, JournalEntry> journalEntries = new HashMap<>();
-    @GetMapping("getAll")
-    public List<JournalEntry> getAll(){
 
-        return new ArrayList<>(journalEntries.values());
+    @Autowired
+    private JournalEntryService journalEntryService;
+
+    @Autowired
+    private UserService userService;
+
+    @PostMapping("{userName}")
+    public ResponseEntity<JournalEntry> createEntry(@RequestBody JournalEntry myEntry, @PathVariable String userName){
+        try {
+            journalEntryService.saveEntry(myEntry, userName);
+            return new ResponseEntity<>(myEntry, HttpStatus.CREATED);
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
     }
 
-    @PostMapping("add")
-    public String createEntry(@RequestBody JournalEntry myEntry){
-        journalEntries.put(myEntry.getId(), myEntry);
-        return "Added Successfully";
+    @GetMapping("{userName}")
+    public ResponseEntity<?> getAllJournalEntriesOfUser(@PathVariable String userName){
+        User user = userService.findByUserName(userName);
+        List<JournalEntry> allData = user.getJournalEntries();
+
+        if(allData!= null && ! allData.isEmpty()) {
+            return new ResponseEntity<>(allData, HttpStatus.OK);
+        }
+        return new ResponseEntity<>("Collection is Empty !",HttpStatus.NO_CONTENT);
     }
 
     @GetMapping("dataAt/{myId}")
-    public JournalEntry getJournalEntryById(@PathVariable long myId){
-        return journalEntries.get(myId);
+    public ResponseEntity<?> getJournalEntryById(@PathVariable ObjectId myId){
+        Optional<JournalEntry> journalEntry = journalEntryService.findById(myId);
+        if(journalEntry.isPresent()){
+            return new ResponseEntity<>(journalEntry.get(), HttpStatus.OK);
+        }
+        return new ResponseEntity<>("Id Not Found !", HttpStatus.NOT_FOUND);
     }
 
-    @DeleteMapping("delete/{myId}")
-    public String deleteJournalEntryById(@PathVariable long myId){
-        journalEntries.remove(myId);
-        return "DELETED";
+    @DeleteMapping("delete/{userName}/{myId}")
+    public ResponseEntity<?> deleteJournalEntryById(@PathVariable String userName,
+                                                    @PathVariable ObjectId myId){
+
+        JournalEntry oldEntry =  journalEntryService.findById(myId).orElse(null);
+        if(oldEntry != null) {
+            journalEntryService.deleteById(myId, userName);
+            return new ResponseEntity<>("Deleted Successfully", HttpStatus.OK);
+        }
+        else
+            return new ResponseEntity<>("Id Not Found !", HttpStatus.NOT_FOUND);
     }
 
-    @PutMapping("update/{myId}")
-    public String updateJournalEntryById(@PathVariable long myId, @RequestBody JournalEntry myEntry){
-        journalEntries.put(myId, myEntry); // if there is no id then the new entry is created
-        return "Updated Successfully";
+    @PutMapping("update/{userName}/{myId}")
+    public ResponseEntity<?> updateJournalEntryById(
+            @PathVariable ObjectId myId,
+            @PathVariable String userName,
+            @RequestBody JournalEntry newEntry){
+        JournalEntry oldEntry = journalEntryService.findById(myId).orElse(null);
+        if(oldEntry != null){
+            oldEntry.setTitle(newEntry.getTitle() != null && !newEntry.getTitle().isEmpty() ? newEntry.getTitle() : oldEntry.getTitle());
+            oldEntry.setContent(newEntry.getContent() != null && !newEntry.getContent().isEmpty() ? newEntry.getContent() : oldEntry.getContent());
+            journalEntryService.saveEntry(oldEntry);
+            return new ResponseEntity<>(oldEntry, HttpStatus.OK);
+        }
+        /*
+        The object in memory is now disconnected from the database at this point.
+        ** -->      oldEntry.setTitle(...);
+                    oldEntry.setContent(...);
+
+        Save to persist changes:
+                    To apply those modified fields and persist them back to the database, you need to explicitly call:
+        ** -->      journalEntryService.saveEntry(oldEntry);
+
+                    Without this step, the database remains unaware of your changes, and the updates won't be permanent.
+         */
+        return new ResponseEntity<>("Id Not Found !", HttpStatus.NOT_FOUND);
     }
 }
-*/
